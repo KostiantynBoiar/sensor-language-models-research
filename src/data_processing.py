@@ -53,6 +53,86 @@ class DataProcessing:
             pass
         return None
 
+    def _statistical_features(self, channels) -> list:
+        """24 features: mean, std, min, max of each of the 6 channels."""
+        features = []
+        for ch in channels:
+            features.extend([
+                float(ch.mean()),
+                float(ch.std()),
+                float(ch.min()),
+                float(ch.max()),
+            ])
+        return features
+
+    def _structural_features(self, channels, magnitude) -> list:
+        """10 structural features."""
+        features = []
+        t = np.arange(len(magnitude))
+
+        # Trend (slope) of each channel
+        for ch in channels:
+            slope = np.polyfit(t, ch, 1)[0]
+            features.append(float(slope))
+
+        # Peaks and drops in overall movement
+        mag = magnitude
+        peaks = np.where((mag[1:-1] > mag[:-2]) & (mag[1:-1] > mag[2:]))[0]
+        drops = np.where((mag[1:-1] < mag[:-2]) & (mag[1:-1] < mag[2:]))[0]
+        features.append(float(len(peaks)))
+        features.append(float(len(drops)))
+
+        # Dominant frequency + power share
+        fft = np.fft.rfft(mag)
+        power = np.abs(fft)**2
+        freqs = np.fft.rfftfreq(len(mag), d=1/30)
+        if power.sum() > 0:
+            dom_idx = np.argmax(power[1:]) + 1
+            features.append(float(freqs[dom_idx]))
+            features.append(float(power[dom_idx] / power.sum()))
+        else:
+            features.extend([0.0, 0.0])
+
+        return features
+
+    def _event_features(self, magnitude, pitch) -> list:
+        """3 binary event features."""
+        # Still period
+        still = float(np.mean(np.abs(magnitude) < 0.05) > 0.7)
+
+        # Large change in wrist angle
+        angle_change = float(np.max(np.abs(np.diff(pitch))) > np.deg2rad(30))
+
+        # Sustained rhythmic movement
+        fft = np.fft.rfft(magnitude)
+        power = np.abs(fft)**2
+        freqs = np.fft.rfftfreq(len(magnitude), d=1/30)
+        dom_idx = np.argmax(power[1:]) + 1 if power.sum() > 0 else 0
+        rhythmic = float(
+            (0.5 < freqs[dom_idx] < 3.0) and (power[dom_idx] / (power.sum() + 1e-8) > 0.3)
+        )
+
+        return [still, angle_change, rhythmic]
+
+    def compute_caption_features(self, window: np.ndarray) -> np.ndarray:
+        """
+        window: (300, 3) at 30 Hz
+        returns: (37,) feature vector
+        """
+        x, y, z = window[:, 0], window[:, 1], window[:, 2]
+
+        magnitude = np.sqrt(x**2 + y**2 + z**2) - 1.0
+        pitch = np.arctan2(y, np.sqrt(x**2 + z**2))
+        roll  = np.arctan2(-x, z)
+        channels = [x, y, z, magnitude, pitch, roll]
+
+        features = []
+        features += self._statistical_features(channels)
+        features += self._structural_features(channels, magnitude)
+        features += self._event_features(magnitude, pitch)
+
+        return np.array(features, dtype=np.float32)
+
     def extract_windows(self, df, window_sec=10, fs=100):
         """
         Very simple window extractor.
@@ -80,3 +160,7 @@ df = dp.load("P001")
 windows = dp.extract_windows(df)
 print(f"Got {len(windows)} windows")
 print(windows[0][0].shape, windows[0][1])
+
+window, label = windows[0]
+feats = dp.compute_caption_features(window)
+print(feats.shape)   # should be (24,) for now
