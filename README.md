@@ -1,29 +1,31 @@
+Updated checklist with what we’ve completed so far:
+
 # Sensor-Language Model Research Experiments
 
 Project checklist for **Do Sensor-Language Models Learn More Than Their Caption Rules?**
 
 ## 1. Project setup
-- [ ] Set up the repository structure.
-- [ ] Set up the Python environment and install dependencies.
-- [ ] Configure Git and `.gitignore`.
+- [x] Set up the repository structure.
+- [x] Set up the Python environment and install dependencies.
+- [x] Configure Git and `.gitignore`.
 
 ## 2. Dataset preparation
-- [ ] Download and organise CAPTURE-24.
-- [ ] Inspect the dataset and annotation files.
-- [ ] Create the train, validation and test participant splits.
-- [ ] Verify that the splits are participant-disjoint.
-- [ ] Save and document the splits.
+- [x] Download and organise CAPTURE-24.
+- [x] Inspect the dataset and annotation files.
+- [x] Create the train, validation and test participant splits.
+- [x] Verify that the splits are participant-disjoint.
+- [x] Save and document the splits.
 
 ## 3. Data processing
-- [ ] Implement sensor data loading.
-- [ ] Implement 10-second window extraction.
-- [ ] Implement the 37 caption features.
+- [x] Implement sensor data loading.
+- [x] Implement 10-second window extraction.
+- [x] Implement the 37 caption features.
 - [ ] Validate the processed data.
 
 ## 4. Caption generation
-- [ ] Define the caption statements and templates.
-- [ ] Implement caption generation.
-- [ ] Ensure captions contain no activity names or time-of-day information.
+- [x] Define the caption statements and templates.
+- [x] Implement caption generation.
+- [x] Ensure captions contain no activity names or time-of-day information.
 - [ ] Audit the generated captions.
 
 ## 5. Baselines
@@ -63,3 +65,5 @@ Project checklist for **Do Sensor-Language Models Learn More Than Their Caption 
 - [ ] Prepare figures and tables.
 - [ ] Write up the findings.
 - [ ] Clean up and prepare the repository for release.
+
+**Current status**: Sections 1–4 are largely done (except validation/audit). Ready to move to the rule baseline (Section 5) or finish the caption audit.

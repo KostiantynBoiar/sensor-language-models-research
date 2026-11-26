@@ -10,6 +10,7 @@ class DataProcessing:
         "manual-work", "walking", "mixed-activity",
         "vehicle", "sports", "bicycling",
     ]
+    LEVELS = ["very low", "low", "medium", "high", "very high"]
 
     def __init__(self, data_dir, split_dir):
         self.data_dir = Path(data_dir)
@@ -114,6 +115,97 @@ class DataProcessing:
 
         return [still, angle_change, rhythmic]
 
+    def fit_percentiles(self, train_features: np.ndarray):
+        """
+        train_features: (N, 37) computed on training participants
+        Stores the 4 cut points for each of the 34 numeric features.
+        """
+        numeric = train_features[:, :34]
+        # 20, 40, 60, 80 percentiles
+        self.percentiles = np.percentile(numeric, [20, 40, 60, 80], axis=0)
+        print("Percentiles fitted.")
+
+    def _value_to_level(self, value: float, feature_idx: int) -> str:
+        cuts = self.percentiles[:, feature_idx]   # shape (4,)
+        level_idx = np.searchsorted(cuts, value)
+        return self.LEVELS[level_idx]
+
+    def features_to_statements(self, features: np.ndarray) -> list[str]:
+        """
+        Convert the 37 caption features into a list of statements.
+        features: (37,) array
+        returns: list of statements (roughly 35)
+        """
+
+        # Templates for the 34 numeric features
+        # Order matches the order we computed them:
+        # 24 statistical (mean/std/min/max × 6 channels) + 10 structural
+        templates = [
+            # statistical: x, y, z, magnitude, pitch, roll 
+            "The mean of the x-axis is {level}.",
+            "The variability of the x-axis is {level}.",
+            "The minimum of the x-axis is {level}.",
+            "The maximum of the x-axis is {level}.",
+
+            "The mean of the y-axis is {level}.",
+            "The variability of the y-axis is {level}.",
+            "The minimum of the y-axis is {level}.",
+            "The maximum of the y-axis is {level}.",
+
+            "The mean of the z-axis is {level}.",
+            "The variability of the z-axis is {level}.",
+            "The minimum of the z-axis is {level}.",
+            "The maximum of the z-axis is {level}.",
+
+            "The mean of overall movement is {level}.",
+            "The variability of overall movement is {level}.",
+            "The minimum of overall movement is {level}.",
+            "The maximum of overall movement is {level}.",
+
+            "The mean of wrist pitch is {level}.",
+            "The variability of wrist pitch is {level}.",
+            "The minimum of wrist pitch is {level}.",
+            "The maximum of wrist pitch is {level}.",
+
+            "The mean of wrist roll is {level}.",
+            "The variability of wrist roll is {level}.",
+            "The minimum of wrist roll is {level}.",
+            "The maximum of wrist roll is {level}.",
+
+            # structural
+            "The trend of the x-axis is {level}.",
+            "The trend of the y-axis is {level}.",
+            "The trend of the z-axis is {level}.",
+            "The trend of overall movement is {level}.",
+            "The trend of wrist pitch is {level}.",
+            "The trend of wrist roll is {level}.",
+
+            "The number of movement peaks is {level}.",
+            "The number of movement drops is {level}.",
+
+            "The dominant frequency of overall movement is {level}.",
+            "The power share of the dominant frequency is {level}.",
+        ]
+
+        statements = []
+
+        # 34 numeric features → 5 levels (crude binning for now)
+        numeric = features[:34]
+        for i, val in enumerate(numeric):
+            # Simple mapping into 0–4; replace with real percentiles later
+            level_idx = int(np.clip(np.round(val * 2 + 2), 0, 4))
+            statements.append(templates[i].format(level=self.LEVELS[level_idx]))
+
+        # 3 events (binary)
+        if features[34] > 0.5:
+            statements.append("There is a still period.")
+        if features[35] > 0.5:
+            statements.append("There is a large change in wrist angle.")
+        if features[36] > 0.5:
+            statements.append("There is sustained rhythmic movement.")
+
+        return statements
+    
     def compute_caption_features(self, window: np.ndarray) -> np.ndarray:
         """
         window: (300, 3) at 30 Hz
@@ -154,13 +246,3 @@ class DataProcessing:
 
             
         return windows
-
-dp = DataProcessing(data_dir="data/capture24", split_dir="data/splits")
-df = dp.load("P001")
-windows = dp.extract_windows(df)
-print(f"Got {len(windows)} windows")
-print(windows[0][0].shape, windows[0][1])
-
-window, label = windows[0]
-feats = dp.compute_caption_features(window)
-print(feats.shape)   # should be (24,) for now
